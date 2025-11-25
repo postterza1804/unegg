@@ -21,13 +21,11 @@ type ExtractOptions struct {
 	Dest        string
 	Password    string
 	Concurrency int
+	Quiet       bool
 }
 
 // ExtractAll extracts every file in the archive to the destination folder.
 func (a *Archive) ExtractAll(opts ExtractOptions) error {
-	if opts.Dest == "" {
-		opts.Dest = "."
-	}
 	if opts.Concurrency <= 0 {
 		opts.Concurrency = runtime.NumCPU()
 	}
@@ -51,6 +49,9 @@ func (a *Archive) ExtractAll(opts ExtractOptions) error {
 	worker := func() {
 		defer wg.Done()
 		for t := range tasks {
+			if !opts.Quiet {
+				fmt.Fprintf(os.Stderr, "extracting: %s\n", t.file.Path)
+			}
 			if err := extractFile(f, opts.Dest, &t.file, opts.Password); err != nil {
 				errCh <- fmt.Errorf("%s: %w", t.file.Path, err)
 				return

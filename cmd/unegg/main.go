@@ -17,6 +17,7 @@ func main() {
 	dest := flag.String("C", "", "destination directory (default: archive base name)")
 	password := flag.String("p", "", "password for encrypted archives")
 	list := flag.Bool("l", false, "list archive contents")
+	quiet := flag.Bool("q", false, "quiet mode (no progress output)")
 	concurrency := flag.Int("j", runtime.NumCPU(), "number of parallel workers")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [options] <archive.egg>\n", os.Args[0])
@@ -55,6 +56,7 @@ func main() {
 		Dest:        destDir,
 		Password:    *password,
 		Concurrency: *concurrency,
+		Quiet:       *quiet,
 	}
 
 	if err := arc.ExtractAll(opts); err != nil {

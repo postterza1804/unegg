@@ -53,9 +53,9 @@ func (z *zipDecryptor) reset(password string) {
 }
 
 func (z *zipDecryptor) updateKeys(b byte) {
-	z.keys[0] = crc32.Update(z.keys[0], crc32.IEEETable, []byte{b})
+	z.keys[0] = crc32ZipUpdate(z.keys[0], b)
 	z.keys[1] = (z.keys[1]+(z.keys[0]&0xff))*0x8088405 + 1
-	z.keys[2] = crc32.Update(z.keys[2], crc32.IEEETable, []byte{byte(z.keys[1] >> 24)})
+	z.keys[2] = crc32ZipUpdate(z.keys[2], byte(z.keys[1]>>24))
 }
 
 func (z *zipDecryptor) decryptByte() byte {
@@ -197,4 +197,8 @@ func hmacSha1(key, data []byte) []byte {
 	m := hmac.New(sha1.New, key)
 	_, _ = m.Write(data)
 	return m.Sum(nil)
+}
+
+func crc32ZipUpdate(crc uint32, b byte) uint32 {
+	return crc32.IEEETable[(byte(crc)^b)&0xff] ^ (crc >> 8)
 }

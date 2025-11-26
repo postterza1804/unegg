@@ -4,9 +4,15 @@ Extract files from egg files.
 
 ## Installation
 
+### Using Homebrew
+
 ```
 brew install blurfx/tap/unegg
 ```
+
+### Using pre-built binary
+
+See [Releases](https://github.com/blurfx/unegg/releases/latest)
 
 ## Usage
 
@@ -15,7 +21,7 @@ Usage: unegg [options] <archive.egg>
   -C string
         destination directory (default: archive base name)
   -j int
-        number of parallel workers (default 14)
+        number of parallel workers
   -l    list archive contents
   -p string
         password for encrypted archives

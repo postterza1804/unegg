@@ -44,11 +44,11 @@ func (a *Archive) ExtractAll(opts ExtractOptions) error {
 		return err
 	}
 
-	f, err := os.Open(a.path)
+	readerAt, cleanup, err := a.getReader()
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer cleanup()
 
 	type task struct {
 		file File
@@ -63,7 +63,7 @@ func (a *Archive) ExtractAll(opts ExtractOptions) error {
 			if !opts.Quiet {
 				fmt.Fprintf(os.Stderr, "extracting: %s\n", t.file.Path)
 			}
-			if err := extractFile(f, opts.Dest, &t.file, opts.Password); err != nil {
+			if err := extractFile(readerAt, opts.Dest, &t.file, opts.Password); err != nil {
 				errCh <- fmt.Errorf("%s: %w", t.file.Path, err)
 				return
 			}
@@ -95,7 +95,7 @@ func (a *Archive) ExtractAll(opts ExtractOptions) error {
 	return nil
 }
 
-func decodeSolidBlock(archive *os.File, block *Block, dst io.Writer) error {
+func decodeSolidBlock(archive io.ReaderAt, block *Block, dst io.Writer) error {
 	src := io.NewSectionReader(archive, block.Offset, int64(block.PackSize))
 	limited := io.LimitReader(src, int64(block.PackSize))
 
@@ -134,7 +134,7 @@ func decodeSolidBlock(archive *os.File, block *Block, dst io.Writer) error {
 	return nil
 }
 
-func extractFile(archive *os.File, dest string, f *File, password string) error {
+func extractFile(archive io.ReaderAt, dest string, f *File, password string) error {
 	if f.Path == "" {
 		f.Path = fmt.Sprintf("%08d", f.Index)
 	}
@@ -182,11 +182,11 @@ func (a *Archive) extractSolid(opts ExtractOptions) error {
 	if err := os.MkdirAll(opts.Dest, 0o755); err != nil {
 		return err
 	}
-	f, err := os.Open(a.path)
+	readerAt, cleanup, err := a.getReader()
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer cleanup()
 
 	var outputs []solidOutput
 	for i := range a.Files {
@@ -226,7 +226,7 @@ func (a *Archive) extractSolid(opts ExtractOptions) error {
 
 	sink := &solidWriter{outputs: outputs}
 	for _, block := range a.SolidBlocks {
-		if err := decodeSolidBlock(f, &block, sink); err != nil {
+		if err := decodeSolidBlock(readerAt, &block, sink); err != nil {
 			return err
 		}
 	}
@@ -298,7 +298,7 @@ func (s *solidWriter) close() error {
 	return nil
 }
 
-func decodeBlock(archive *os.File, out *os.File, block *Block, dec decryptor) error {
+func decodeBlock(archive io.ReaderAt, out *os.File, block *Block, dec decryptor) error {
 	src := io.NewSectionReader(archive, block.Offset, int64(block.PackSize))
 	var r io.Reader = src
 	if dec != nil {
@@ -436,4 +436,15 @@ func secureJoin(base, rel string) (string, error) {
 		return "", fmt.Errorf("egg: illegal path %q", rel)
 	}
 	return joined, nil
+}
+
+func (a *Archive) getReader() (io.ReaderAt, func(), error) {
+	if a.reader != nil {
+		return a.reader, func() {}, nil
+	}
+	f, err := os.Open(a.path)
+	if err != nil {
+		return nil, func() {}, err
+	}
+	return f, func() { _ = f.Close() }, nil
 }

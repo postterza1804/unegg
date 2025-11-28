@@ -46,11 +46,6 @@ const sampleEncryptedHex = "" +
 	"78 " + // data
 	"22 82 E2 08" // end of archive
 
-// first part of the spec's split example (not supported yet)
-const sampleSplitHex = "" +
-	"45 47 47 41 00 01 01 00 00 00 00 00 00 00 " + // egg header
-	"62 A2 F5 24 00 08 00 00 00 00 00 02 00 00 00" // split header with next id=2
-
 func writeSampleEgg(t *testing.T, path string) {
 	t.Helper()
 	writeHex(t, path, sampleSimpleHex)
@@ -326,17 +321,6 @@ func TestParseEncryptedArchive(t *testing.T) {
 	}
 }
 
-func TestParseSplitArchiveFails(t *testing.T) {
-	tmp := t.TempDir()
-	eggPath := filepath.Join(tmp, "split.egg")
-	writeHex(t, eggPath, sampleSplitHex)
-
-	// TODO: support split archives
-	if _, err := Parse(eggPath); err == nil || err != ErrUnsupportedSplit {
-		t.Fatalf("parse error = %v, want ErrUnsupportedSplit", err)
-	}
-}
-
 func TestExtractZipCryptoArchive(t *testing.T) {
 	password := "pw"
 	name := "secret.txt"
@@ -436,6 +420,36 @@ func TestExtractSolidArchiveSynthetic(t *testing.T) {
 	}
 	if string(gotA) != "a" || string(gotB) != "bc" {
 		t.Fatalf("extracted content = %q, %q; want %q, %q", gotA, gotB, "a", "bc")
+	}
+}
+
+func TestExtractSplitArchives(t *testing.T) {
+	cases := []string{
+		"split.nocompress.vol1.egg",
+		"split.high.vol1.egg",
+	}
+	for _, name := range cases {
+		name := name
+		t.Run(name, func(t *testing.T) {
+			arc, err := Parse(testdataPath(name))
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			dest := t.TempDir()
+			if err := arc.ExtractAll(ExtractOptions{Dest: dest, Quiet: true}); err != nil {
+				t.Fatalf("extract: %v", err)
+			}
+			data, err := os.ReadFile(filepath.Join(dest, "data.txt"))
+			if err != nil {
+				t.Fatalf("read: %v", err)
+			}
+			if len(data) == 0 {
+				t.Fatalf("empty extracted data")
+			}
+			if strings.Contains(name, "nocompress") && !bytes.HasPrefix(data, []byte("0123456789")) {
+				t.Fatalf("unexpected data prefix")
+			}
+		})
 	}
 }
 
